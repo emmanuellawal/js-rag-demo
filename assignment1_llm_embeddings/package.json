@@ -18,22 +18,15 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-<<<<<<< Updated upstream
-    "@langchain/community": "^0.0.32",
+    "@langchain/anthropic": "^0.1.1",
+    "@langchain/community": "^0.3.39",
+    "@langchain/cohere": "^0.0.5",
     "@langchain/openai": "^0.0.14",
     "chromadb": "^1.7.3",
     "dotenv": "^16.3.1",
     "express": "^5.1.0",
-    "langchain": "^0.1.20",
-    "socket.io": "^4.8.1"
-=======
-    "@langchain/anthropic": "^0.1.1",
-    "@langchain/community": "^0.3.39",
-    "@langchain/cohere": "^0.0.5",
-    "chromadb": "^1.7.3",
-    "dotenv": "^16.3.1",
     "langchain": "^0.3.20",
+    "socket.io": "^4.8.1",
     "@xenova/transformers": "^2.15.0"
->>>>>>> Stashed changes
   }
 }

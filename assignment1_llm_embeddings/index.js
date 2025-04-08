@@ -1,12 +1,14 @@
-// RAG Demo with LangChain and OpenAI
+// RAG Demo with LangChain and Anthropic
 import { config } from 'dotenv';
 import { DirectoryLoader } from 'langchain/document_loaders/fs/directory';
 import { TextLoader } from 'langchain/document_loaders/fs/text';
 import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
 import { OpenAIEmbeddings, ChatOpenAI } from "@langchain/openai";
-import { MemoryVectorStore } from "langchain/vectorstores/memory";
-import path from 'path'; // Import path module
-import { fileURLToPath } from 'url'; // Import fileURLToPath
+import { ChatAnthropic } from '@langchain/anthropic';
+import { MemoryVectorStore } from 'langchain/vectorstores/memory';
+import { HuggingFaceTransformersEmbeddings } from '@langchain/community/embeddings/hf_transformers';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Get the directory name of the current module
 const __filename = fileURLToPath(import.meta.url);
@@ -29,20 +31,20 @@ async function runRAGDemo() {
   try {
     // Initialize models with explicit configuration
     const embeddings = new OpenAIEmbeddings({
-      modelName: "text-embedding-ada-002",
-      stripNewLines: true
+      openAIApiKey: process.env.OPENAI_API_KEY
     });
     
     const llm = new ChatOpenAI({
       modelName: 'gpt-3.5-turbo',
-      temperature: 0.2
+      temperature: 0.2,
+      openAIApiKey: process.env.OPENAI_API_KEY
     });
     
     // Step 1: Load documents
     console.log('\n📚 Loading documents...');
     // Construct the absolute path to the documents directory
     const documentsPath = path.join(__dirname, 'documents'); 
-    console.log(`Looking for documents in: ${documentsPath}`); // Add logging
+    console.log(`Looking for documents in: ${documentsPath}`);
     const loader = new DirectoryLoader(documentsPath, {
       '.txt': (path) => new TextLoader(path)
     });
@@ -92,33 +94,19 @@ async function runRAGDemo() {
 // Process a single query using the vector store
 async function processQuery(query, vectorStore, llm) {
   console.log(`\n❓ Question: ${query}`);
-  console.log('Retrieving relevant documents...');
   
   try {
-    // Get similar documents
-    const relevantDocs = await vectorStore.similaritySearch(query, 2);
+    // Search for relevant documents
+    const relevantDocs = await vectorStore.similaritySearch(query, 3);
     console.log(`Found ${relevantDocs.length} relevant documents.`);
     
-    // Extract context
-    const context = relevantDocs.map((doc, i) => {
-      return `Document ${i+1}:\n${doc.pageContent}`;
-    }).join('\n\n');
+    // Create a prompt with the context and query
+    const context = relevantDocs.map(doc => doc.pageContent).join('\n\n');
+    const prompt = `Context: ${context}\n\nQuestion: ${query}\n\nPlease provide a detailed answer based on the context provided.`;
     
-    // Generate response
-    console.log('Generating answer using context...');
-    const prompt = `
-      Answer the question based on the following context:
-      
-      ${context}
-      
-      Question: ${query}
-      
-      When answering, make sure to cite your source as [Document X] where X is the document number.
-    `;
-    
+    // Get response from the LLM
     const response = await llm.invoke(prompt);
-    console.log('\n🔍 Answer:');
-    console.log(response.content);
+    console.log('\n🤖 Answer:', response.content);
     
   } catch (error) {
     console.error('Error processing query:', error);
@@ -126,6 +114,4 @@ async function processQuery(query, vectorStore, llm) {
 }
 
 // Run the demo
-runRAGDemo()
-  .then(() => console.log('\nRAG demo completed.'))
-  .catch(error => console.error('Fatal error in RAG demo:', error));
+runRAGDemo().catch(console.error);
