@@ -12,13 +12,68 @@
         #messages { list-style-type: none; margin: 0; padding: 0; }
         #messages > li { padding: 0.5rem 1rem; }
         #messages > li:nth-child(odd) { background: #efefef; }
+        #typing-indicator { 
+            position: fixed; 
+            bottom: 3rem; 
+            left: 0; 
+            right: 0; 
+            padding: 0.5rem 1rem; 
+            font-style: italic; 
+            color: #666; 
+            background: rgba(255, 255, 255, 0.9);
+            display: none;
+        }
+        #users-list {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 200px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 1rem;
+            border-left: 1px solid #ddd;
+            border-bottom: 1px solid #ddd;
+            max-height: calc(100vh - 3rem);
+            overflow-y: auto;
+        }
+        #users-list h3 {
+            margin: 0 0 0.5rem 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #ddd;
+        }
+        #users-list ul {
+            list-style-type: none;
+            margin: 0;
+            padding: 0;
+        }
+        #users-list li {
+            padding: 0.25rem 0;
+            color: #666;
+        }
+        #users-list li::before {
+            content: "•";
+            color: #4CAF50;
+            font-weight: bold;
+            display: inline-block;
+            width: 1em;
+            margin-left: -1em;
+        }
+        #main-content {
+            margin-right: 200px;
+        }
     </style>
 </head>
 <body>
-    <ul id="messages"></ul>
-    <form id="form" action="">
-        <input id="input" autocomplete="off" /><button>Send</button>
-    </form>
+    <div id="users-list">
+        <h3>Connected Users</h3>
+        <ul id="users"></ul>
+    </div>
+    <div id="main-content">
+        <ul id="messages"></ul>
+        <div id="typing-indicator"></div>
+        <form id="form" action="">
+            <input id="input" autocomplete="off" /><button>Send</button>
+        </form>
+    </div>
 
     <!-- Include the Socket.IO client library -->
     <script src="/socket.io/socket.io.js"></script>
@@ -26,11 +81,16 @@
         // Connect to the Socket.IO server (defaults to the server that served this page)
         const socket = io();
         let username = '';
+        let typingTimeout = null;
+        // Set to track users who are currently typing
+        const typingUsers = new Set();
 
         // Get references to the HTML elements
         const form = document.getElementById('form');
         const input = document.getElementById('input');
         const messages = document.getElementById('messages');
+        const typingIndicator = document.getElementById('typing-indicator');
+        const usersList = document.getElementById('users');
 
         // --- Get Username ---
         function getUsername() {
@@ -42,11 +102,71 @@
             socket.emit('set username', username); // Send username to server
         }
 
+        // --- Update Users List ---
+        function updateUsersList(users) {
+            usersList.innerHTML = '';
+            users.forEach(user => {
+                const li = document.createElement('li');
+                li.textContent = user.username;
+                usersList.appendChild(li);
+            });
+        }
+
+        // --- Typing Indicator Logic ---
+        function handleTyping() {
+            if (!username) return; // Don't emit typing events if username isn't set
+            
+            // Clear any existing timeout
+            if (typingTimeout) {
+                clearTimeout(typingTimeout);
+            }
+
+            // Emit typing event
+            socket.emit('typing');
+
+            // Set a timeout to emit stop typing after 1 second of no typing
+            typingTimeout = setTimeout(() => {
+                socket.emit('stop typing');
+            }, 1000);
+        }
+
+        // Function to update the typing indicator display
+        function updateTypingIndicator() {
+            const typingCount = typingUsers.size;
+            if (typingCount === 0) {
+                typingIndicator.style.display = 'none';
+                return;
+            }
+
+            const users = Array.from(typingUsers);
+            let message = '';
+            
+            if (typingCount === 1) {
+                message = `${users[0]} is typing...`;
+            } else if (typingCount === 2) {
+                message = `${users[0]} and ${users[1]} are typing...`;
+            } else {
+                message = `${users[0]} and ${typingCount - 1} others are typing...`;
+            }
+
+            typingIndicator.textContent = message;
+            typingIndicator.style.display = 'block';
+        }
+
+        // Add input event listener for typing
+        input.addEventListener('input', handleTyping);
+
         // --- Sending Messages ---
         // Add an event listener for when the form is submitted
         form.addEventListener('submit', function(event) {
             event.preventDefault(); // Prevent the default form submission (page reload)
             if (input.value && username) { // Check if the input field is not empty AND username is set
+                // Clear typing timeout and emit stop typing
+                if (typingTimeout) {
+                    clearTimeout(typingTimeout);
+                    socket.emit('stop typing');
+                }
+                
                 // Emit a 'chat message' event to the server with the input value
                 socket.emit('chat message', input.value);
                 input.value = ''; // Clear the input field
@@ -55,9 +175,7 @@
 
         // --- Receiving Messages ---
         // Add an event listener for 'chat message' events coming FROM the server
-        // This is a CALLBACK function (the anonymous function provided here).
-        // It gets called *later* by the socket.io library when a 'chat message' event arrives.
-        socket.on('chat message', function(data) { // `function(data) {...}` is an ANONYMOUS FUNCTION
+        socket.on('chat message', function(data) {
             displayMessage(data.user, data.msg);
         });
 
@@ -66,24 +184,40 @@
             displayMessage('System', msg, true);
         });
 
+        // Listen for user list updates
+        socket.on('user list', function(users) {
+            updateUsersList(users);
+        });
+
+        // Listen for typing indicators
+        socket.on('user typing', function(data) {
+            typingUsers.add(data.username);
+            updateTypingIndicator();
+        });
+
+        socket.on('user stopped typing', function(data) {
+            typingUsers.delete(data.username);
+            updateTypingIndicator();
+        });
+
         // --- Utility function to display messages ---
         function displayMessage(user, msg, isSystem = false) {
-            const item = document.createElement('li'); // Create a new list item element
+            const item = document.createElement('li');
             if (isSystem) {
                 item.style.fontStyle = 'italic';
                 item.style.color = 'gray';
-                item.textContent = msg; // System messages don't show 'System:' prefix explicitly
+                item.textContent = msg;
             } else {
-                item.textContent = `${user}: ${msg}`; // Set its text content
+                item.textContent = `${user}: ${msg}`;
             }
-            messages.appendChild(item); // Add the list item to the messages list
-            window.scrollTo(0, document.body.scrollHeight); // Scroll to the bottom
+            messages.appendChild(item);
+            window.scrollTo(0, document.body.scrollHeight);
         }
 
         // --- Optional: Listen for connect/disconnect events on client ---
         socket.on('connect', () => {
             console.log('✅ Connected to server:', socket.id);
-            getUsername(); // Ask for username after connecting
+            getUsername();
         });
 
         socket.on('disconnect', () => {

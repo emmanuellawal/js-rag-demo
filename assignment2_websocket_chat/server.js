@@ -12,6 +12,19 @@ const PORT = process.env.PORT || 3001; // Changed port to 3001
 // Keep track of connected users (socket.id -> username)
 const users = {};
 
+// Function to get list of connected users
+function getConnectedUsers() {
+    return Object.entries(users).map(([id, username]) => ({
+        id,
+        username
+    }));
+}
+
+// Function to broadcast user list to all clients
+function broadcastUserList() {
+    io.emit('user list', getConnectedUsers());
+}
+
 // --- ASYNC/PROMISE Demonstration ---
 /**
  * Simulates fetching a welcome message asynchronously.
@@ -51,6 +64,9 @@ app.get('/', (req, res) => {
 io.on('connection', async (socket) => {
   console.log('✅ A user connected:', socket.id); // Log when a new client connects
 
+  // Send current user list to the newly connected client
+  socket.emit('user list', getConnectedUsers());
+
   // Listen for the client setting their username
   // Another ANONYMOUS FUNCTION CALLBACK
   socket.on('set username', async (username) => { // Mark inner callback as async too for await
@@ -60,6 +76,9 @@ io.on('connection', async (socket) => {
     // Broadcast to *other* users that this user has joined
     // `.broadcast` sends to everyone *except* the current socket
     socket.broadcast.emit('system message', `${username} has joined the chat!`);
+
+    // Broadcast updated user list to all clients
+    broadcastUserList();
 
     // --- ASYNC/AWAIT Demonstration ---
     try {
@@ -87,6 +106,8 @@ io.on('connection', async (socket) => {
       // Broadcast to other users that this user has left
       socket.broadcast.emit('system message', `${username} has left the chat.`);
       delete users[socket.id]; // Remove user from our tracking object
+      // Broadcast updated user list to all clients
+      broadcastUserList();
     } else {
         console.log(`❌ User ${socket.id} (no username set) disconnected`);
     }
@@ -105,6 +126,23 @@ io.on('connection', async (socket) => {
       // Handle case where message received before username is set (optional)
       console.log(`💬 Message from anonymous user (${socket.id}): ${msg}`);
        socket.emit('system message', "Please set a username before sending messages.");
+    }
+  });
+
+  // Handle typing indicators
+  socket.on('typing', () => {
+    const username = users[socket.id];
+    if (username) {
+      // Broadcast to all clients except the sender
+      socket.broadcast.emit('user typing', { username: username });
+    }
+  });
+
+  socket.on('stop typing', () => {
+    const username = users[socket.id];
+    if (username) {
+      // Broadcast to all clients except the sender
+      socket.broadcast.emit('user stopped typing', { username: username });
     }
   });
 });
