@@ -1,0 +1,82 @@
+Answers to Assignment Questions
+
+1. Evolution of Embeddings:
+- TF-IDF Limitation: TF-IDF was limited to finding documents with similar keywords but couldn't capture deeper semantic meaning or understand synonyms (like "car" and "automobile" being related).
+- Transformer vs LSTM: LSTMs struggled with long-range dependencies and could only process text unidirectionally. The Transformer architecture solved this with self-attention mechanisms that could analyze the entire input sequence simultaneously and weigh word importance regardless of distance.
+
+2. BERT's Bidirectional Contribution:
+BERT's bidirectional pre-training was revolutionary because of its Masked Language Model (MLM) approach. It could predict masked tokens using both preceding AND succeeding context, forcing a deeper understanding of word relationships and context. This was a significant improvement over previous models that only looked at context in one direction.
+
+3. BERT vs OpenAI Ada-002 Comparison:
+
+Feature               | Sentence-BERT          | OpenAI Ada-002
+---------------------|------------------------|-------------------------
+Hosting              | Local/Self-hosted      | Cloud API
+Cost                 | Free (+ compute costs) | Pay-per-use
+Privacy              | High (data local)      | Lower (data to OpenAI)
+Performance          | Hardware dependent     | Very Fast
+Max Input Tokens     | Typically 512         | 8191
+Ease of Use          | Moderate setup needed | Very Easy
+Customization        | High                  | None
+Quality              | Task-specific high    | Strong general-purpose
+
+Recent Performance Data (from OpenAI Community):
+- Ada-002 ranks 15th on the MTEB leaderboard
+- Shows higher Pearson correlation (0.83) with ground truth compared to BERT variants (0.76-0.79)
+- Best performing model for 8k+ token inputs
+
+4. Chunking Scenario for 1000-page Textbook:
+
+Necessity:
+- Essential due to model token limits (512 for BERT, 8191 for Ada-002)
+- 1000 pages would far exceed these limits
+- Enables more focused and relevant retrieval
+
+Two Recommended Chunking Strategies:
+1. Document-Specific Chunking:
+   - Split by natural document structure (chapters, sections)
+   - Uses existing headers/markers for logical breaks
+   
+2. Recursive Character Text Splitting:
+   - Hierarchical splitting using separators (\n\n, \n, ., space)
+   - Preserves natural language boundaries
+
+Factors for Chunk Size/Overlap:
+- Model token limit constraints
+- Content density (technical vs narrative)
+- Retrieval goals (precise vs broad context)
+- Model performance with different input lengths
+- Overlap needed for context preservation (typically 10-20%)
+
+5. Model Selection Rationale:
+
+a) Startup FAQ Chatbot:
+Recommendation: OpenAI Ada-002
+Rationale:
+- Ease of use and quick implementation
+- Strong general-purpose performance
+- Public data means privacy less critical
+- Cost justified by development speed
+
+b) Hospital Patient Records:
+Recommendation: Local SBERT
+Rationale:
+- Data privacy critical for medical records
+- Data stays local
+- One-time setup cost vs ongoing API costs
+- Can be customized for medical terminology
+
+c) Solo Developer Note-Taking App:
+Recommendation: Local SBERT
+Rationale:
+- Powerful local hardware available
+- One-time setup vs ongoing costs
+- Personal data privacy
+- Can be customized for personal note style
+
+Additional Considerations:
+Recent developments (from OpenAI Community) suggest considering hybrid approaches:
+- Combining multiple embedding models
+- Using fine-tuned models for specific domains
+- Considering new open-source alternatives like jina-embeddings-v2-base-en
+- Implementing sophisticated retrieval strategies for better results 
